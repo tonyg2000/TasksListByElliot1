@@ -10,6 +10,7 @@ namespace TasksListByElliot1
     {
         static void Main(string[] args)
         {
+            new App().Run();
         }
     }
 }
