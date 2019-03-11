@@ -9,24 +9,34 @@ namespace TasksListByElliot1
 {
     class App
     {
-        private List<string> taskList;
+        private List<string> tasks = new List<string>();
+        private List<bool> isActioned = new List<bool>();
+
+        private int selectedTask = 0;
+
+        const int pageLength = 25;
 
         public App()
         {
-            Console.OutputEncoding = System.Text.Encoding.Unicode;
-            taskList = ReadListFromFile();
+            Console.OutputEncoding = Encoding.Unicode;
+
+            ReadListFromFile();
+
+           
         }
 
 
         public void Run()
         {
-            taskList = ReadListFromFile();
+           
 
             bool quit;
 
             do
             {
+                RemoveFirstActionedItems();
                 PrintTaskList();
+              
                 var key = RunInputCycle();
                 quit = HandleUserInput(key);
 
@@ -37,12 +47,32 @@ namespace TasksListByElliot1
             Console.WriteLine();
         }
 
+        private void RemoveFirstActionedItems()
+        {
+
+
+            while (isActioned[0])
+            {
+
+                tasks.RemoveAt(0);
+                isActioned.RemoveAt(0);
+                selectedTask -= 1;
+
+            }
+
+            if (selectedTask < 0)
+            {
+                selectedTask = 0;
+            }
+        }
+          
+
         private ConsoleKey RunInputCycle()
         {
             ConsoleKey key;
 
             PrintUsageOptions();
-            key = GetInputFromUsers();
+            key = GetInputFromUser();
 
             return key;
 
@@ -53,72 +83,196 @@ namespace TasksListByElliot1
             switch (key)
             {
                 case ConsoleKey.A:
-                    InputTaskListToList();
+                    InputTaskToList();
                     break;
-
-                case ConsoleKey.B:
-
+                case ConsoleKey.D:
+                    DeleteCurrentlySelectedTask();
                     break;
-
                 case ConsoleKey.N:
-
+                    SelectNextPage();
                     break;
-
                 case ConsoleKey.DownArrow:
-
+                    SelectNextUnactionedTask();
                     break;
-
                 case ConsoleKey.Enter:
-
+                    WorkOnSelectTask();
                     break;
-
                 case ConsoleKey.Q:
                     return true;
-
             }
             return false;
+
+
+
         }
 
-        private ConsoleKey GetInputFromUsers()
+        private void SelectNextPage()
+        {
+            var page = GetPage();
+            selectedTask = FirstElementInPage(page + 1) - 1;
+
+            
+            SelectNextUnactionedTask();
+        }
+
+        private void WorkOnSelectTask()
+        {
+            bool valid = false;
+
+            do
+            {
+                Console.Clear();
+                Console.WriteLine($"Working on: {tasks[selectedTask]}");
+                Console.WriteLine("r: re-enter | c: completed | q: cancel");
+                Console.Write("Input: ");
+
+                var key = GetInputFromUser();
+
+                switch (key)
+                {
+                    case ConsoleKey.R:
+                        AddTaskToList(tasks[selectedTask]);
+                        DeleteCurrentlySelectedTask();
+                        valid = true;
+                        break;
+
+                    case ConsoleKey.C:
+                        DeleteCurrentlySelectedTask();
+                        valid = true;
+                        break;
+
+                    case ConsoleKey.Q:
+                        valid = true;
+                        break;
+
+                }
+            } while (!valid);
+
+        }
+
+        private void DeleteCurrentlySelectedTask()
+        {
+            isActioned[selectedTask] = true;
+            SelectNextUnactionedTask();
+        }
+
+        private void SelectNextUnactionedTask()
+        {
+
+            bool overflowed = false;
+
+            do
+            {
+                selectedTask += 1;
+
+                if (selectedTask >= isActioned.Count)
+                {
+                    selectedTask = 0;
+                    overflowed = true;
+                }
+
+            } while (!overflowed && isActioned[selectedTask]);
+
+        }
+
+        private ConsoleKey GetInputFromUser()
         {
             return Console.ReadKey().Key;
         }
 
         private void PrintUsageOptions()
         {
-            Console.WriteLine("a: add | d: delete | n: next page | \u2193: select | enter: actions | q: quit");
-
+            Console.WriteLine("a: add | d: delete | n: next page | \u2193: select | enter: action | q: quit");
+            Console.Write("Input: ");
         }
 
-        private void InputTaskListToList()
+        private void InputTaskToList()
         {
             Console.Clear();
-            Console.WriteLine("Add a new task: ");
+            Console.WriteLine("Add a new task (empty to cancel): ");
+
             var input = Console.ReadLine();
-            taskList.Add(input);
+
+            
+        }
+
+        private void AddTaskToList(string input)
+        {
+            if (!string.IsNullOrWhiteSpace(input))
+
+                tasks.Add(input);
+            isActioned.Add(false);
         }
 
         private void PrintTaskList()
         {
-            foreach(var t in taskList)
+            Console.Clear();
+            int page = GetPage();
+            int startingPoint = FirstElementInPage(page);
+
+            int endingPoint = FirstElementInPage(page + 1);
+
+            for (int i = startingPoint; (i < endingPoint) && (i < tasks.Count); ++i)
             {
-                Console.WriteLine(t);
+                if (isActioned[i])
+                {
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                }
+
+                else if (i == selectedTask)
+                {
+                    Console.BackgroundColor = ConsoleColor.Gray;
+                    Console.ForegroundColor = ConsoleColor.Black;
+                }
+
+                Console.WriteLine(tasks[i]);
+
+                Console.ForegroundColor = ConsoleColor.Gray;
+                Console.BackgroundColor = ConsoleColor.Black;
             }
 
             Console.WriteLine();
 
         }
 
-        private List<string> ReadListFromFile()
+        private static int v(int page)
         {
-            var taskList = new List<string>();
+            return FirstElementInPage(page + 1);
+        }
+
+        private static int FirstElementInPage(int page)
+        {
+            return page * pageLength;
+        }
+
+        private int GetPage()
+        {
+            return selectedTask / pageLength;
+        }
+
+        private void ReadListFromFile()
+        {
+            
 
             try
             {
                 using (StreamReader sr = new StreamReader(@"C:\Users\ignacio\source\repos\TasksListByElliot1\TasksListByElliot1\bin\Debug\TaskList.txt"))
                 {
-                    var input = sr.ReadLine();
-                    taskList.Add(input);
+                    while (!sr.EndOfStream)
+                    {
+                        var input = sr.ReadLine();
+                        var splits = input.Split(new char[] { '\x1e' });
+
+                        if(splits.Length == 2)
+                        {
+                            tasks.Add(splits[0]);
+                            isActioned.Add(bool.Parse(splits[1]));
+                        }
+
+
+                       
+                    }
+                    
 
                 } 
             }
@@ -128,18 +282,17 @@ namespace TasksListByElliot1
                 {; }
             }
 
-            return taskList;
+          
         }
 
         private void WriteListToFile()
         {
             using (StreamWriter sw = new StreamWriter(@"C:\Users\ignacio\source\repos\TasksListByElliot1\TasksListByElliot1\bin\Debug\TaskList.txt"))
             {
-                foreach (var t in taskList)
+                for (int i = 0; i < tasks.Count; ++i)
                 {
-                    Console.WriteLine(t);
+                    sw.WriteLine($"{tasks[i]}\x1e{isActioned[i]}");
                 }
-
             }
         }
        
@@ -147,3 +300,10 @@ namespace TasksListByElliot1
 
     
 }
+
+
+
+
+
+
+
